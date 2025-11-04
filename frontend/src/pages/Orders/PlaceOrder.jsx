@@ -16,10 +16,11 @@ const PlaceOrder = () => {
   const [createOrder, { isLoading, error }] = useCreateOrderMutation();
 
   useEffect(() => {
-    if (!cart.shippingAddress.address) {
+    // If shipping address is missing, redirect the user to shipping step.
+    if (!cart?.shippingAddress?.address) {
       navigate("/shipping");
     }
-  }, [cart.paymentMethod, cart.shippingAddress.address, navigate]);
+  }, [cart?.shippingAddress?.address, navigate]);
 
   const dispatch = useDispatch();
 
@@ -37,7 +38,11 @@ const PlaceOrder = () => {
       dispatch(clearCartItems());
       navigate(`/order/${res._id}`);
     } catch (error) {
-      toast.error(error);
+      // RTK Query errors can have different shapes. Prefer server message but fall
+      // back to a generic message when missing.
+      const message =
+        error?.data?.message || error?.data || error?.message || error?.error || "Failed to place order";
+      toast.error(message);
     }
   };
 
@@ -49,42 +54,72 @@ const PlaceOrder = () => {
         {cart.cartItems.length === 0 ? (
           <Message>Your cart is empty</Message>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr>
-                  <td className="px-1 py-2 text-left align-top">Image</td>
-                  <td className="px-1 py-2 text-left">Product</td>
-                  <td className="px-1 py-2 text-left">Quantity</td>
-                  <td className="px-1 py-2 text-left">Price</td>
-                  <td className="px-1 py-2 text-left">Total</td>
-                </tr>
-              </thead>
+            <>
+              {/* Desktop / tablet: table view (md and up) */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr>
+                      <td className="px-1 py-2 text-left align-top">Image</td>
+                      <td className="px-1 py-2 text-left">Product</td>
+                      <td className="px-1 py-2 text-left">Quantity</td>
+                      <td className="px-1 py-2 text-left">Price</td>
+                      <td className="px-1 py-2 text-left">Total</td>
+                    </tr>
+                  </thead>
 
-              <tbody>
-                {cart.cartItems.map((item, index) => (
-                  <tr key={index}>
-                    <td className="p-2">
-                      <img
-                        src={item.image}
-                        alt={item.name}
-                        className="w-16 h-16 object-cover"
-                      />
-                    </td>
+                  <tbody>
+                    {cart.cartItems.map((item, index) => (
+                      <tr key={index}>
+                        <td className="p-2">
+                          <img
+                            src={item.image}
+                            alt={item.name}
+                            className="w-16 h-16 object-cover"
+                          />
+                        </td>
 
-                    <td className="p-2">
-                      <Link to={`/product/${item.product}`}>{item.name}</Link>
-                    </td>
-                    <td className="p-2">{item.qty}</td>
-                    <td className="p-2">{item.price.toFixed(2)}</td>
-                    <td className="p-2">
-                      $ {(item.qty * item.price).toFixed(2)}
-                    </td>
-                  </tr>
+                        <td className="p-2">
+                          <Link to={`/product/${item.product}`}>{item.name}</Link>
+                        </td>
+                        <td className="p-2">{item.qty}</td>
+                        <td className="p-2">{Number(item.price).toFixed(2)}</td>
+                        <td className="p-2">₹ {(item.qty * item.price).toFixed(2)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile: stacked cards */}
+              <div className="md:hidden space-y-4">
+                {cart.cartItems.map((item, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-start gap-4 p-4 bg-neutral-900 rounded-md"
+                  >
+                    <img
+                      src={item.image}
+                      alt={item.name}
+                      className="w-20 h-20 object-cover flex-shrink-0 rounded"
+                    />
+                    <div className="flex-1">
+                      <Link
+                        to={`/product/${item.product}`}
+                        className="text-lg font-medium"
+                      >
+                        {item.name}
+                      </Link>
+                      <div className="mt-2 text-sm text-gray-300">
+                        <div>Qty: {item.qty}</div>
+                        <div>Price: ₹{Number(item.price).toFixed(2)}</div>
+                        <div>Total: ₹{(item.qty * item.price).toFixed(2)}</div>
+                      </div>
+                    </div>
+                  </div>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </div>
+            </>
         )}
 
         <div className="mt-8">
@@ -92,19 +127,19 @@ const PlaceOrder = () => {
           <div className="flex justify-between flex-wrap p-8 bg-[#181818]">
             <ul className="text-lg">
               <li>
-                <span className="font-semibold mb-4">Items:</span> $
+                <span className="font-semibold mb-4">Items:</span> ₹
                 {cart.itemsPrice}
               </li>
               <li>
-                <span className="font-semibold mb-4">Shipping:</span> $
+                <span className="font-semibold mb-4">Shipping:</span> ₹
                 {cart.shippingPrice}
               </li>
               <li>
-                <span className="font-semibold mb-4">Tax:</span> $
+                <span className="font-semibold mb-4">Tax:</span> ₹
                 {cart.taxPrice}
               </li>
               <li>
-                <span className="font-semibold mb-4">Total:</span> $
+                <span className="font-semibold mb-4">Total:</span> ₹
                 {cart.totalPrice}
               </li>
             </ul>
@@ -129,10 +164,10 @@ const PlaceOrder = () => {
           <button
             type="button"
             className="bg-pink-500 text-white py-2 px-4 rounded-full text-lg w-full mt-4"
-            disabled={cart.cartItems === 0}
+            disabled={cart.cartItems.length === 0 || isLoading}
             onClick={placeOrderHandler}
           >
-            Place Order
+            {isLoading ? "Placing order..." : "Place Order"}
           </button>
 
           {isLoading && <Loader />}
